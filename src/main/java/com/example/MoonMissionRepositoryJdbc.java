@@ -1,25 +1,18 @@
 package com.example;
 
-
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MoonMissionRepositoryJdbc implements MoonMissionInterface {
+public class MoonMissionRepositoryJdbc implements MoonMissionRepository {
 
-    private Connection connection;
+    private final Connection connection;
 
     public MoonMissionRepositoryJdbc(Connection connection) {
         this.connection = connection;
     }
 
-
-
-
+    @Override
     public List<MoonMission> listAllMissions() {
         List<MoonMission> missions = new ArrayList<>();
         String sql = "SELECT * FROM moon_mission";
@@ -38,7 +31,6 @@ public class MoonMissionRepositoryJdbc implements MoonMissionInterface {
                         rs.getString("outcome")
                 ));
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -46,7 +38,7 @@ public class MoonMissionRepositoryJdbc implements MoonMissionInterface {
         return missions;
     }
 
-
+    @Override
     public MoonMission findMoonMissionById(int id) {
         String sql = "SELECT * FROM moon_mission WHERE mission_id = ?";
 
@@ -66,7 +58,6 @@ public class MoonMissionRepositoryJdbc implements MoonMissionInterface {
                     );
                 }
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -82,11 +73,8 @@ public class MoonMissionRepositoryJdbc implements MoonMissionInterface {
             stmt.setInt(1, year);
 
             try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
-                }
+                if (rs.next()) return rs.getInt(1);
             }
-
         } catch (SQLException e) {
             e.printStackTrace();
         }

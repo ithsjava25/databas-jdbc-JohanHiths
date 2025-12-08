@@ -1,14 +1,15 @@
 package com.example;
 
 
-import org.mindrot.jbcrypt.BCrypt;
 
+import java.util.List;
 import java.sql.*;
 import java.util.Arrays;
 
 public class Main {
     public void runApplicationMenu(Connection connection) throws SQLException {
-        MoonMissionInterface missionRepo = new MoonMissionRepositoryJdbc(connection);
+        MoonMissionRepository missionRepo = new MoonMissionRepositoryJdbc(connection);
+        AccountRepository accountRepo = new JdbcAccountRepository(connection);
         boolean isRunning = true;
         while (isRunning) {
             System.out.println("1) List moon missions (prints spacecraft names from `moon_mission`).\n" +
@@ -18,27 +19,105 @@ public class Main {
                     "   5) Update an account password (prompts: user_id, new password; prints confirmation).\n" +
                     "   6) Delete an account (prompts: user_id; prints confirmation).\n" +
                     "   0) Exit.");
-            int choice = Integer.parseInt(IO.readln());
+            int choice;
+
+            try {
+                choice = Integer.parseInt(IO.readln("Enter choice: "));
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid choice.");
+                continue;
+            }
             switch (choice) {
                 case 0:
+                    isRunning = false;
                     break;
                 case 1:
-                    printMoonMissions(connection);
+                    List<MoonMission> missions = missionRepo.listAllMissions();
+                    System.out.println("\nMoon Missions");
+                    for (MoonMission m : missions) {
+                        System.out.println(m.getSpacecraft());
+                    }
+
                     break;
                 case 2:
-                    printMoonMissionId(connection);
+                    System.out.print("Enter the mission ID: ");
+                    String input = IO.readln();
+                    int missionId = Integer.parseInt(input);
+
+                    MoonMission mission = missionRepo.findMoonMissionById(missionId);
+
+                    if (mission == null) {
+                        System.out.println(" Mission not found.");
+                    } else {
+                        System.out.println("\n--- Mission Details ---");
+                        System.out.println("ID: " + mission.getMissionId());
+                        System.out.println("Spacecraft: " + mission.getSpacecraft());
+                        System.out.println("Launch date: " + mission.getLaunchDate());
+                        System.out.println("Outcome: " + mission.getOutcome());
+                        System.out.println("Carrier rocket: " + mission.getCarrierRocket());
+                        System.out.println("------------------------");
+                    }
                     break;
                 case 3:
-                    printMissionYear(connection);
+                    int year = 0;
+                    while (true) {
+                        try {
+                            String yearInput = IO.readln("Enter the launch year: ");
+                            year = Integer.parseInt(yearInput);
+                            break;
+                        } catch (NumberFormatException e) {
+                            System.out.println("Invalid year. Please enter a numeric value.");
+                        }
+                    }
+
+                    int count = missionRepo.countMissionsByYear(year);
+
+                    System.out.println("Number of missions launched in " + year + ": " + count);
                     break;
+
+
                 case 4:
-                    printAccountCreation(connection);
+                    System.out.println("Enter first name");
+                    firstName = IO.readln();
+                    System.out.println("Enter last name");
+                    lastName = IO.readln();
+                    System.out.println("Enter SSN");
+                    ssn = IO.readln();
+                    System.out.println("Enter password");
+                    password = IO.readln();
+
+                    rawPassword = password;
+
+                    hashedPassword = BCrypt.hashpw(rawPassword, BCrypt.gensalt());
+                    boolean success = accountRepo.createAccount(firstName, lastName, ssn, hashedPassword);
+
+                    if (success) {
+                        System.out.println("Account created successfully.");
+                    } else {
+                        System.out.println("Account creation failed.");
+                    }
+
                     break;
                 case 5:
-                    printAccountUpdate(connection);
+                    while (true) {
+                        System.out.println("Enter the usedId to update password");
+                        String input = IO.readln();
+                        password = Integer.parseInt(input);
+
+                        hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+                        boolean updatePassword ( int userId, String hashedPassword);
+
+                        if (updatePassword) {
+                            System.out.println("Password updated successfully.");
+                            continue;
+                        } else {
+                            System.out.println("Password update failed.");
+                            break;
+                        }
+                    }
                     break;
                 case 6:
-                    printAccountDeletion(connection);
+                   printAccountDeletion(connection);
 
                     break;
             }
@@ -47,20 +126,7 @@ public class Main {
 
     }
 
-    //private void printListToConsole(List<Mission> missions) {
-    //System.out.println("\n--- 🚀 MOON MISSIONS ---");
-    //System.out.printf("%-5s | %-20s | %s\n", "ID", "SPACECRAFT", "LAUNCH DATE");
-    //System.out.println("------------------------------------------");
 
-    //for (Mission mission : missions) {
-    // System.out.printf("%-5d | %-20s | %s\n",
-    //  mission.getMissionId(),
-    //  mission.getSpacecraft(),
-    //   mission.getLaunchDate());
-
-    // }
-    //System.out.println("------------------------------------------");
-    //}
 
     static void main(String[] args) throws SQLException {
         if (isDevMode(args)) {
@@ -91,7 +157,7 @@ public class Main {
                 String username = IO.readln("Username:");
                 String password = IO.readln("Password:");
 
-                String query = "SELECT * FROM account WHERE name = ? AND password = ?";
+                String query = "SELECT * FROM account WHERE first_name = ? AND password = ?";
 
                 try (PreparedStatement pstmt = connection.prepareStatement(query)) {
 
@@ -103,7 +169,7 @@ public class Main {
                         if (rs.next()) {
                             System.out.println("Logged in!");
                             runApplicationMenu(connection);
-                            return;  // EXIT run() method
+                            return;
                         } else {
                             System.out.println("invalid");
                         }
@@ -233,7 +299,7 @@ public class Main {
         String password = IO.readln();
 
 
-        String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+        //String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
 
         String sql = "INSERT INTO account (first_name, last_name, ssn, password) VALUES (?, ?, ?, ?)";
 
@@ -241,7 +307,7 @@ public class Main {
             pstmt.setString(1, firstName);
             pstmt.setString(2, lastName);
             pstmt.setString(3, SSN);
-            pstmt.setString(4, hashedPassword);
+            pstmt.setString(4, password);
             int rows = pstmt.executeUpdate();
 
             if (rows > 0) {

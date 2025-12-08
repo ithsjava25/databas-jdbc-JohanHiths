@@ -35,7 +35,7 @@ public class MoonMission {
         return launchDate;
     }
 
-    public String getCarrier() {
+    public String getCarrierRocket() {
         return carrierRocket;
     }
 
@@ -48,27 +48,22 @@ public class MoonMission {
         return missionType;
     }
 
-    public void setSpacecraft(String Spacecraft) {
-
+    public String getOutcome() {
+        return outcome;
     }
 
-    public void setCarrier(String carrier) {
-
+    @Override
+    public String toString() {
+        return "MoonMission {" +
+                "missionId=" + missionId +
+                ", spacecraft='" + spacecraft + '\'' +
+                ", launchDate=" + launchDate +
+                ", carrierRocket='" + carrierRocket + '\'' +
+                ", operator='" + operator + '\'' +
+                ", missionType='" + missionType + '\'' +
+                ", outcome='" + outcome + '\'' +
+                '}';
     }
 
-    public void setOperator(String operator) {
-    }
-
-    public void setLaunchDate(Date launchDate) {
-
-    }
-
-    public void setMissionType(String missionType) {
-
-    }
-
-    public void setOutcome(String outcome) {
-
-    }
 
 }
