@@ -1,21 +1,79 @@
 package com.example;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
+
+import org.mindrot.jbcrypt.BCrypt;
+
+import java.sql.*;
 import java.util.Arrays;
 
 public class Main {
+    public void runApplicationMenu(Connection connection) throws SQLException {
+        MoonMissionInterface missionRepo = new MoonMissionRepositoryJdbc(connection);
+        boolean isRunning = true;
+        while (isRunning) {
+            System.out.println("1) List moon missions (prints spacecraft names from `moon_mission`).\n" +
+                    "   2) Get a moon mission by mission_id (prints details for that mission).\n" +
+                    "   3) Count missions for a given year (prompts: year; prints the number of missions launched that year).\n" +
+                    "   4) Create an account (prompts: first name, last name, ssn, password; prints confirmation).\n" +
+                    "   5) Update an account password (prompts: user_id, new password; prints confirmation).\n" +
+                    "   6) Delete an account (prompts: user_id; prints confirmation).\n" +
+                    "   0) Exit.");
+            int choice = Integer.parseInt(IO.readln());
+            switch (choice) {
+                case 0:
+                    break;
+                case 1:
+                    printMoonMissions(connection);
+                    break;
+                case 2:
+                    printMoonMissionId(connection);
+                    break;
+                case 3:
+                    printMissionYear(connection);
+                    break;
+                case 4:
+                    printAccountCreation(connection);
+                    break;
+                case 5:
+                    printAccountUpdate(connection);
+                    break;
+                case 6:
+                    printAccountDeletion(connection);
 
-    static void main(String[] args) {
+                    break;
+            }
+
+        }
+
+    }
+
+    //private void printListToConsole(List<Mission> missions) {
+    //System.out.println("\n--- 🚀 MOON MISSIONS ---");
+    //System.out.printf("%-5s | %-20s | %s\n", "ID", "SPACECRAFT", "LAUNCH DATE");
+    //System.out.println("------------------------------------------");
+
+    //for (Mission mission : missions) {
+    // System.out.printf("%-5d | %-20s | %s\n",
+    //  mission.getMissionId(),
+    //  mission.getSpacecraft(),
+    //   mission.getLaunchDate());
+
+    // }
+    //System.out.println("------------------------------------------");
+    //}
+
+    static void main(String[] args) throws SQLException {
         if (isDevMode(args)) {
             DevDatabaseInitializer.start();
         }
         new Main().run();
+
+
     }
 
-    public void run() {
-        // Resolve DB settings with precedence: System properties -> Environment variables
+    public void run() throws SQLException {
+
+
         String jdbcUrl = resolveConfig("APP_JDBC_URL", "APP_JDBC_URL");
         String dbUser = resolveConfig("APP_DB_USER", "APP_DB_USER");
         String dbPass = resolveConfig("APP_DB_PASS", "APP_DB_PASS");
@@ -27,20 +85,39 @@ public class Main {
         }
 
         try (Connection connection = DriverManager.getConnection(jdbcUrl, dbUser, dbPass)) {
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        }
-        //Todo: Starting point for your code
-        String query = "select * from moon_mission";
-    }
 
-    /**
-     * Determines if the application is running in development mode based on system properties,
-     * environment variables, or command-line arguments.
-     *
-     * @param args an array of command-line arguments
-     * @return {@code true} if the application is in development mode; {@code false} otherwise
-     */
+            while (true) {
+
+                String username = IO.readln("Username:");
+                String password = IO.readln("Password:");
+
+                String query = "SELECT * FROM account WHERE name = ? AND password = ?";
+
+                try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+
+                    pstmt.setString(1, username);
+                    pstmt.setString(2, password);
+
+                    try (ResultSet rs = pstmt.executeQuery()) {
+
+                        if (rs.next()) {
+                            System.out.println("Logged in!");
+                            runApplicationMenu(connection);
+                            return;  // EXIT run() method
+                        } else {
+                            System.out.println("invalid");
+                        }
+                    }
+
+                } catch (SQLException e) {
+                    System.err.println("Database error during login: " + e.getMessage());
+                }
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Initial database connection failed.", e);
+        }
+    }
     private static boolean isDevMode(String[] args) {
         if (Boolean.getBoolean("devMode"))  //Add VM option -DdevMode=true
             return true;
@@ -49,15 +126,187 @@ public class Main {
         return Arrays.asList(args).contains("--dev"); //Argument --dev
     }
 
-    /**
-     * Reads configuration with precedence: Java system property first, then environment variable.
-     * Returns trimmed value or null if neither source provides a non-empty value.
-     */
+
     private static String resolveConfig(String propertyKey, String envKey) {
         String v = System.getProperty(propertyKey);
         if (v == null || v.trim().isEmpty()) {
             v = System.getenv(envKey);
         }
         return (v == null || v.trim().isEmpty()) ? null : v.trim();
+    }
+
+    private static void printMoonMissions(Connection connection) throws SQLException {
+        String moonQuery = "SELECT spacecraft FROM moon_mission";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(moonQuery);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            System.out.println("\n=== Moon Missions ===");
+            while (rs.next()) {
+                System.out.println("- " + rs.getString("spacecraft"));
+            }
+
+
+        }
+
+    }
+
+
+    private static void printMoonMissionId(Connection connection) throws SQLException {
+
+
+        int missionId;
+        while (true) {
+            try {
+                String input = IO.readln("Enter the mission ID: ");
+                missionId = Integer.parseInt(input);
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Please enter a valid mission ID (number).");
+            }
+        }
+
+        String sql = "SELECT * FROM moon_mission WHERE mission_id = ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, missionId);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+
+                if (rs.next()) {
+                    System.out.println("\n=== Mission Details ===");
+                    System.out.println("Mission ID: " + rs.getInt("mission_id"));
+                    System.out.println("Spacecraft: " + rs.getString("spacecraft"));
+                    System.out.println("Launch Date: " + rs.getDate("launch_date"));
+                    System.out.println("Carrier Rocket: " + rs.getString("carrier_rocket"));
+                    System.out.println("Operator: " + rs.getString("operator"));
+                    System.out.println("Mission Type: " + rs.getString("mission_type"));
+                    System.out.println("Outcome: " + rs.getString("outcome"));
+                } else {
+                    System.out.println("No mission found with ID " + missionId);
+                }
+            }
+        }
+    }
+
+    private static void printMissionYear(Connection connection) throws SQLException {
+        int missionYear;
+        while (true) {
+            try {
+                String input = IO.readln("Enter mission year (number)");
+                missionYear = Integer.parseInt(input);
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Please enter mission year (number).");
+            }
+        }
+
+
+
+
+
+        String moonDate = "SELECT count(*) FROM moon_mission WHERE YEAR(launch_date) = ?";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(moonDate)) {
+            pstmt.setInt(1, missionYear);
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+
+
+
+                if (rs.next()) {
+                    int count = rs.getInt(1);
+                    System.out.println("\nMission Type: " + missionYear + ": " + count);
+                }
+            }
+        }
+    }
+
+    private static void printAccountCreation(Connection connection) throws SQLException {
+        System.out.println("First name");
+        String firstName = IO.readln();
+        System.out.println("Last name");
+        String lastName = IO.readln();
+        System.out.println("SSN");
+        String SSN = IO.readln();
+        System.out.println("Password");
+        String password = IO.readln();
+
+
+        String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+
+        String sql = "INSERT INTO account (first_name, last_name, ssn, password) VALUES (?, ?, ?, ?)";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, firstName);
+            pstmt.setString(2, lastName);
+            pstmt.setString(3, SSN);
+            pstmt.setString(4, hashedPassword);
+            int rows = pstmt.executeUpdate();
+
+            if (rows > 0) {
+                System.out.println("\nAccount Created");
+            } else {
+                System.out.println("\nAccount Creation Failed");
+            }
+        }
+    }
+
+    private static void printAccountUpdate(Connection connection) throws SQLException {
+        System.out.println("First name");
+        String firstName = IO.readln();
+        System.out.println("Last name");
+        String lastName = IO.readln();
+        System.out.println("SSN");
+        String SSN = IO.readln();
+        System.out.println("Password");
+        String password = IO.readln();
+
+        String account = "Update account SET password = ?, ssn ? WHERE last_name = ?";
+        ;
+
+        try (PreparedStatement pstmt = connection.prepareStatement(account)) {
+            pstmt.setString(1, firstName);
+            pstmt.setString(2, lastName);
+            pstmt.setString(3, SSN);
+            pstmt.setString(4, password);
+
+            int rs = pstmt.executeUpdate();
+            {
+                if (rs > 0) {
+                    System.out.println("\nAccount Updated");
+                } else {
+                    System.out.println("\nAccount Update Failed");
+                }
+            }
+        }
+    }
+
+    private static void printAccountDeletion(Connection connection) throws SQLException {
+        int accountId;
+        while (true) {
+            try {
+                String input = IO.readln("Enter the user ID to delete: ");
+                accountId = Integer.parseInt(input);
+                break;
+            } catch (NumberFormatException e) {
+                System.out.println("Please enter a valid user ID (number).");
+            }
+        }
+
+        String sql = "DELETE FROM account WHERE user_id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(String.valueOf(sql))) {
+            pstmt.setInt(1, accountId);
+            ;
+
+            int rs = pstmt.executeUpdate();
+            {
+                if (rs > 0) {
+                    System.out.println("\nAccount Id" + accountId + "removed");
+                } else {
+                    System.out.println("\nAccount Id" + accountId + "Removal Failed");
+                }
+            }
+        }
     }
 }
